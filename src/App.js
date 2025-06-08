@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
 import AddCompetition from './components/AddCompetition';
@@ -28,20 +28,6 @@ function App() {
   const [editData, setEditData] = useState(null);
   const [announcementData, setAnnouncementData] = useState(null);
 
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('athlonet_token', token);
-      const decoded = parseJwt(token);
-      if (decoded?.organization?.id) {
-        setUser({ id: decoded.organization.id });
-        if (isVerified) {
-          fetchCompetitions();
-        }
-        setCurrentPage('dashboard');
-      }
-    }
-  }, [token, isVerified]);
-
   const parseJwt = (token) => {
     try {
       return JSON.parse(atob(token.split('.')[1]));
@@ -49,6 +35,36 @@ function App() {
       return null;
     }
   };
+
+  const fetchCompetitions = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/event/organizer/${user.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setCompetitions(data.competitions);
+      }
+    } catch (err) {
+      console.error('Error fetching competitions:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('athlonet_token', token);
+      const decoded = parseJwt(token);
+      if (decoded?.organization?.id) {
+        setUser({ id: decoded.organization.id });
+        setCurrentPage('dashboard');
+      }
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (user?.id && isVerified) {
+      fetchCompetitions();
+    }
+  }, [user, isVerified, fetchCompetitions]);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -94,18 +110,6 @@ function App() {
       alert('Registration error: ' + err.message);
     }
     setLoading(false);
-  };
-
-  const fetchCompetitions = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/event/organizer/${user.id}`);
-      const data = await res.json();
-      if (data.success) {
-        setCompetitions(data.competitions);
-      }
-    } catch (err) {
-      console.error('Error fetching competitions:', err);
-    }
   };
 
   const handleAddCompetition = async () => {
